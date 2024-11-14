@@ -1,0 +1,123 @@
+#1. Setting working directory and importing the dataset
+
+setwd("C:/Users/Harsh Deep/OneDrive/Desktop/BUA 650")
+library(readr)
+airline.df <- read.csv("Chapter_06_flight_delay.csv", header = TRUE)
+View(airline.df) 
+
+#2. checking the data class, column names and structure of the data
+
+names(airline.df)
+dim(airline.df)
+data.class(airline.df)
+str(airline.df) 
+
+#3. checking for and NA value
+
+sum(is.na(airline.df))
+
+# descriptive statistics of Dependent variable - Arrival delay (Arr_Delay)
+
+summary(airline.df$Arr_Delay)
+
+
+#scatter plots for graphical method
+
+par(mfcol=c(1,1))
+scatter.smooth(airline.df$Number_of_flights, airline.df$Arr_Delay, main = "Figure 1 Arrival Delay vs Number of Flights", xlab="Number_of_flights", ylab = "Arr_Delay")
+scatter.smooth(airline.df$Security_o, airline.df$Arr_Delay, main = "Figure 2 Arrival Delay vs Time in Security checking", xlab="Security_o", ylab = "Arr_Delay") #1
+scatter.smooth(airline.df$Support_Crew_Available, airline.df$Arr_Delay, main = "Figure 3 Arrival Delay vs Number of Support Crew", xlab="Support_Crew_Available", ylab = "Arr_Delay")
+scatter.smooth(airline.df$Airport_Distance, airline.df$Arr_Delay, main = "Figure 4 Arrival Delay vs Distance between Airports", xlab="Airport_Distance", ylab = "Arr_Delay")
+scatter.smooth(airline.df$Baggage_loading_time, airline.df$Arr_Delay, main = "Figure 5 Arrival Delay vs Baggage loading time", xlab="Baggage_loading_time", ylab = "Arr_Delay")
+scatter.smooth(airline.df$Late_Arrival_o, airline.df$Arr_Delay, main = "Figure 6 Arrival Delay vs Late Arrival of Aircraft", xlab="Late_Arrival_o", ylab = "Arr_Delay")
+scatter.smooth(airline.df$Weather, airline.df$Arr_Delay, main = "Figure 7 Arrival Delay vs Weather", xlab="Weather", ylab = "Arr_Delay") #2
+scatter.smooth(airline.df$Fueling_o, airline.df$Arr_Delay, main = "Figure 8 Arrival Delay vs Fueling Time", xlab="Fueling_o", ylab = "Arr_Delay") #3 
+scatter.smooth(airline.df$Cleaning_o, airline.df$Arr_Delay, main = "Figure 9 Arrival Delay vs Cleaning Time", xlab="Cleaning_o", ylab = "Arr_Delay") #4
+  
+#removing the categorical column from the data ie. carrier
+  
+data2 <- airline.df[-c(1)]
+View(data2)
+
+#correlation matrix between variables
+cor(data2)
+corr_mtx <- data.frame(cor(data2))
+
+#splitting the data to training and testing dataset
+#install package "caTools"
+
+install.packages("caTools")
+library("caTools")
+
+set.seed(10000) #to make analysis repeatable
+
+sample <- sample.split(data2$Arr_Delay, SplitRatio=0.70)
+
+train_data <- subset(data2, sample==TRUE)
+test_data <- subset(data2, sample==FALSE)
+options(max.print = 10000)
+
+#Model Building
+#train data is used to build model and test data to test the performance of the model
+
+model <- lm(Arr_Delay ~ ., data = train_data)
+summary(model)
+
+#building final multiple regression model with significant variables on train_data set
+
+model_sig <- lm(Arr_Delay ~ Airport_Distance+Number_of_flights+Weather+Support_Crew_Available+Baggage_loading_time+Late_Arrival_o, data = train_data)
+summary(model_sig)
+
+#number of fitted values
+
+length(model_sig$fitted.values)
+
+#predicting fitted values of train_data 
+
+pred_train <- model_sig$fitted.values
+pred_train = data.frame(pred_train)
+
+#residual values
+
+resed_train = model_sig$residuals
+resed_train <- data.frame(resed_train)
+
+#prediction of unforseen dataset on test data
+
+pred_test <- predict(model_sig, newdata=test_data)
+head(pred_test)
+pred_test <- data.frame(pred_test)
+
+#plotting actual vs predicted results
+par(mfcol=c(1,1))
+  plot(test_data$Arr_Delay, col="red", type = "l", lty=2,main="Actual vs Predicted Values", ylab="Test data - Arrival delay")
+  lines(pred_test, col="blue", type="l", lty=1.5, xlab="Test data - Index")
+
+#linear regression diagnostics statistics and plot
+  
+
+#plot function to view four different diagnostic plots
+
+par(mfcol=c(1,1))
+  plot(model_sig,which=1)
+  plot(model_sig,which=2)
+  plot(model_sig,which=3)
+  plot(model_sig,which=4)
+  plot(model_sig,which=6)
+  
+#install packages car
+install.packages("car")
+library(car)
+
+#test for autocorrelation
+durbinWatsonTest(model_sig) #not required in cross sectional data
+
+#statistical test for Homoscedacity
+
+ncvTest(model_sig)
+
+#VIF test for Collinearity
+
+vif(model_sig)
+sqrt(vif(model_sig)) > 5
+
