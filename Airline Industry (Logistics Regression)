@@ -1,0 +1,179 @@
+setwd("C:/Users/Harsh Deep/OneDrive/Desktop/BUA 650")
+
+library(readr)
+
+#importing the file
+
+loan_data <- read.csv("loan_default.csv")
+
+#changing data to data frame
+loan_data <- data.frame(loan_data)
+data.class(loan_data)
+
+#exploring the data
+
+head(loan_data)
+names(loan_data)
+str(loan_data)
+
+#checking for missing values
+
+sum(is.na(loan_data))
+
+numeric_data <- loan_data[-c(5,6,11)]
+
+summary(loan_data$Credit_score)
+#correlation matrix
+
+cor_matrix <- round(data.frame(cor(numeric_data)), 2)
+View(cor_matrix)
+
+#setting seed for repeated testing with same sample
+set.seed(999)
+
+#splitting data 70:30
+train_obs <- floor(nrow(loan_data) * 0.7)
+print(train_obs)
+
+train_index <- sample(x=seq_len(nrow(loan_data)), size = train_obs)
+test_index <- -train_index
+
+train_data <- loan_data[train_index,]
+test_data <- loan_data[test_index,]
+
+#building a model dependent variable Defaut and all independent variables
+
+model <- glm(Default~., data = train_data, family=binomial(link=logit))
+summary(model)
+
+library(car)
+vif(model)
+
+#taking all the significant variables for model2
+
+model2 <- glm(Default~Checking_amount+Term+Credit_score+Saving_amount+Age, data = train_data, family=binomial(link=logit))
+summary(model2)
+
+vif(model2) # all good.
+
+#Predicting model using test data
+Prob <- predict(model2, test_data, type = "response")
+Prob <- data.frame(Prob)
+Prob <- round(Prob, 3)
+
+#Creating a classification table for actual and predicted values
+Predicted <- ifelse(Prob > 0.7, 1, 0)
+
+Actual <- test_data$Default
+
+Actual == Predicted #will give index and TRUE/FALSE values
+table(Actual, Predicted)
+
+#calculating error
+Actual != Predicted
+mean(Actual != Predicted)
+
+error_rate <- round(mean(Actual != Predicted), 3)
+accuracy_rate <- 1-error_rate
+
+print(accuracy_rate)
+print(error_rate)
+
+# Creating a confusion matrix
+
+library(caret)
+library(ggplot2)
+library(lattice)
+
+length(Predicted) == length(Actual)  # Should return TRUE
+
+# Convert to factors and ensure levels match
+Predicted <- factor(Predicted, levels = c("0", "1"))
+Actual <- factor(Actual, levels = c("0", "1"))
+
+confusionMatrix(Predicted, Actual, positive = "1" )
+#MODEL FIT TEST 
+#Hosmer-Lemeshow Test
+#Install  MKmisc package
+
+#install.packages("MKmisc")
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+#  install.packages("BiocManager")
+#BiocManager::install("limma")
+
+library(MKmisc)
+
+HLgof.test(fit = fitted(model2), obs = train_data$Default)
+
+#Install ResourceSelection package
+
+#install.packages("ResourceSelection ")
+
+library(ResourceSelection)
+
+hoslem.test(train_data$Default, fitted(model2), g=10)
+
+#Likelihood Ratio Test
+
+model3<-glm(Default~Checking_amount+Term+Amount,
+            data= train_data,family=binomial(link=logit))
+
+summary(model3)
+
+#Install lmtest package
+
+#install.packages("lmtest")
+
+library(lmtest)
+
+lrtest(model, model2)
+
+# Statistical Tests for Individual Predictors: Wald Test#
+#Install survey package
+
+#install.packages("survey")
+
+library(survey)
+
+# wald
+
+# Wald test for Credit_Score
+
+regTermTest(model2,"Credit_score")
+
+# Wald test for Age
+
+regTermTest(model2, "Age")
+
+# Wald test for Checking Amount
+
+regTermTest(model2, "Checking_amount")
+
+# Wald test for Saving Amount
+
+regTermTest(model2, "Saving_amount")
+
+# Wald test for Term
+
+regTermTest(model2, "Term")
+
+# conducting Receiver operating characteristic (ROC) test and Area under
+#install.packages("ROCR")
+library(ROCR)
+
+# Compute AUC for predicting Default with the model
+
+Pred <- prediction(Prob, Actual)
+
+#plot TPR vs FPR
+pmf <- performance(Pred, measure = "tpr", x.measure = "fpr")
+
+auc <- performance(Pred, measure = "auc")
+auc <- auc@y.values[[1]]
+print(auc)
+
+plot(pmf, col = "red",main = "Probability Mass Function (PMF)")
+text(0.5, 0.5, paste("AUC =", round(auc, 3)), col = "black", cex = 1.0)
+
+#Area under Curve (AUC) values greater than 70% are considered as the model with
+#high predictive accuracy.
